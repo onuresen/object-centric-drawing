@@ -152,7 +152,7 @@
         <div id="relationGuide" class="marking-guide relation-guide" hidden>
           <span class="marking-pulse" aria-hidden="true"></span>
           <span class="marking-guide-copy">
-            <strong id="relationGuideTitle">Relating</strong>
+            <strong id="relationGuideTitle">Linking</strong>
             <span id="relationGuideText">Click the other object's mark, or pick it in the list. Any page or PDF.</span>
           </span>
           <kbd>Esc</kbd>
@@ -246,7 +246,7 @@
               <h4 id="relationSectionTitle">Links</h4>
               <div class="subsection-actions">
                 <span id="relationCount">0</span>
-                <button id="toggleTrace" class="compact-action" type="button" aria-pressed="false" title="Follow relations from this object, across pages">Trace</button>
+                <button id="toggleTrace" class="compact-action" type="button" aria-pressed="false" title="Follow links from this object, across pages">Trace</button>
                 <button id="startRelation" class="compact-action" type="button" aria-keyshortcuts="C" title="Link to another object (C)">+ Add</button>
               </div>
             </div>
@@ -266,7 +266,7 @@
                 <button id="endTrace" class="icon-button" type="button" aria-label="End trace" title="End trace (Escape)">×</button>
               </div>
               <ol id="traceList" class="trace-list"></ol>
-              <button id="exportTraceOnexus" class="compact-action" type="button" title="Download only the traced objects and their relations as an ONEXUS graph">Export trace to ONEXUS</button>
+              <button id="exportTraceOnexus" class="compact-action" type="button" title="Download only the traced objects and their links as an ONEXUS graph">Export trace to ONEXUS</button>
             </section>
           </section>
 
@@ -381,8 +381,8 @@
           <label class="display-option display-check" title="Show object labels on the drawing (L)">
             <input id="showLabels" type="checkbox"> Labels
           </label>
-          <label class="display-option display-check" title="Show every relation on this page, not only the selected object's (G)">
-            <input id="showAllRelations" type="checkbox"> Relations
+          <label class="display-option display-check" title="Show every link on this page, not only the selected object's (G)">
+            <input id="showAllRelations" type="checkbox"> Links
           </label>
         </div>
 
@@ -428,8 +428,8 @@
             <label class="visually-hidden" for="onexusUrl">ONEXUS address</label>
             <input id="onexusUrl" class="text-input" type="url" autocomplete="off" spellcheck="false">
           </details>
-          <button id="exportOnexus" class="button revit-relations-action" type="button" title="Download objects and relations as an ONEXUS graph. Revit IDs are used when the Revit file is loaded." disabled>Export ONEXUS graph</button>
-          <button id="removeRevitRelations" class="compact-action revit-relations-action" type="button" title="Remove every relation the Revit export added. Undo brings them back." hidden>Remove Revit relations</button>
+          <button id="exportOnexus" class="button revit-relations-action" type="button" title="Download objects and links as an ONEXUS graph. Revit IDs are used when the Revit file is loaded." disabled>Export ONEXUS graph</button>
+          <button id="removeRevitRelations" class="compact-action revit-relations-action" type="button" title="Remove every link the Revit export added. Undo brings them back." hidden>Remove Revit links</button>
           <p id="sidecarStatus" class="sidecar-status" role="alert" hidden></p>
         </section>
       </div>
@@ -483,7 +483,7 @@
         <span id="relationPhrasePreview"></span>
         <strong id="relationToLabel"></strong>
       </p>
-      <label class="field-label" for="relationType">Relation</label>
+      <label class="field-label" for="relationType">Link type</label>
       <select id="relationType" class="text-input"></select>
       <div id="relationSideField" class="relation-side-field" hidden>
         <label class="field-label" for="relationSide">Room side</label>
@@ -495,7 +495,7 @@
       <div class="relation-dialog-actions">
         <button id="swapRelation" class="button button-quiet" type="button" title="Swap direction">⇄ Swap</button>
         <button id="deleteRelation" class="button danger-button" type="button">Delete</button>
-        <button id="saveRelationMore" class="button" type="button" title="Save, then click more marks to add the same relation">Save, add more</button>
+        <button id="saveRelationMore" class="button" type="button" title="Save, then click more marks to add the same link">Save, add more</button>
         <button id="saveRelation" class="button button-primary" type="submit">Save</button>
       </div>
     </form>
