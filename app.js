@@ -1718,7 +1718,7 @@ function renderMarkLabels(objectsById) {
 
 // ── Relations ─────────────────────────────────────────────
 // Lines run between the nearest marks of two related objects on the current page.
-// They follow the selected object unless "Relations" asks for every line on the page.
+// They follow the selected object unless "Links" asks for every line on the page.
 
 function relationsToDraw() {
   if (state.display.markFocus === "none" || state.markMode) {
@@ -1811,7 +1811,7 @@ function renderRelationLines(objectsById) {
     pill.dataset.relationId = relation.id;
     pill.textContent = relation.label || relationPhrase(relation);
     pill.title = `${relationSentence(relation)}. Click to edit.`;
-    pill.setAttribute("aria-label", `Edit relation: ${relationSentence(relation)}`);
+    pill.setAttribute("aria-label", `Edit link: ${relationSentence(relation)}`);
     const onView = rotateBounds({ x: curve.mid.x, y: curve.mid.y, width: 0, height: 0 }, state.rotation);
     pill.style.left = `${onView.x * 100}%`;
     pill.style.top = `${onView.y * 100}%`;
@@ -1864,7 +1864,7 @@ function appendRelationHandle(occurrence) {
   handle.setAttribute("class", "relation-handle");
   handle.dataset.relationHandle = occurrence.objectId;
   const title = document.createElementNS(SVG_NAMESPACE, "title");
-  title.textContent = "Drag to another mark to relate (or press C)";
+  title.textContent = "Drag to another mark to link (or press C)";
   handle.append(title);
   overlayLayer.append(handle);
 }
@@ -1904,14 +1904,14 @@ function finishRelationDrag(event) {
     // A click on the dot is the same as pressing Relate.
     const object = getObject(state.relateFromObjectId);
     renderOverlay();
-    setStatus(`Relating ${object?.label ?? ""}. Click the other object's mark or pick it in the list. Escape cancels.`);
+    setStatus(`Linking ${object ? objectDisplayName(object) : ""}. Click the other object's mark or pick it in the list. Escape cancels.`);
     return;
   }
   const target = document.elementsFromPoint(event.clientX, event.clientY)
     .find((element) => element.dataset?.occurrenceId && !element.dataset.resizeHandle && element.dataset.vertexIndex === undefined);
   if (!target) {
     setRelateMode(null);
-    setStatus("Relating cancelled. Drop the line on another mark to relate.");
+    setStatus("Linking cancelled. Drop the line on another mark to link.");
     return;
   }
   pickRelationTarget(getOccurrence(target.dataset.occurrenceId)?.objectId ?? null);
@@ -1936,7 +1936,7 @@ function setRelateMode(objectId, repeat = null) {
       ? `${objectDisplayName(object)} · ${repeatPhrase(state.relateRepeat)}`
       : `Linking ${objectDisplayName(object)}`;
   elements.relationGuideText.textContent = state.relateRepeat
-    ? "Each mark or list object you click gets this relation. Esc to finish."
+    ? "Each mark or list object you click gets this link. Esc to finish."
     : "Click the other object's mark, or pick it in the list. Any page or PDF.";
   elements.pageSurface.classList.toggle("is-relating", enabled);
   elements.sidePanel.classList.toggle("is-relating", enabled);
@@ -2130,7 +2130,7 @@ function saveRelationDraft(event, { addMore = false } = {}) {
       side: saved.side ?? null,
       sourceIsFrom: saved.from === sourceObjectId,
     });
-    setStatus(`Saved: ${relationSentence(saved)}. Now click more marks for the same relation. Escape finishes.`);
+    setStatus(`Saved: ${relationSentence(saved)}. Now click more marks for the same link. Escape finishes.`);
     return;
   }
   setStatus(`Saved: ${relationSentence(saved)}.`);
@@ -2151,7 +2151,7 @@ function deleteRelationById(relationId) {
 function renderRelationList() {
   const revitRelationCount = state.relations.filter((relation) => relation.origin === "revit").length;
   elements.removeRevitRelations.hidden = revitRelationCount === 0;
-  elements.removeRevitRelations.textContent = `Remove ${revitRelationCount} Revit relation${revitRelationCount === 1 ? "" : "s"}`;
+  elements.removeRevitRelations.textContent = `Remove ${revitRelationCount} Revit link${revitRelationCount === 1 ? "" : "s"}`;
   const object = getObject(state.selectedObjectId);
   if (state.relateFromObjectId && !getObject(state.relateFromObjectId)) {
     setRelateMode(null);
@@ -2184,7 +2184,7 @@ function renderRelationList() {
     phrase.dataset.action = "edit-relation";
     phrase.dataset.relationId = entry.relation.id;
     phrase.textContent = entry.phrase;
-    phrase.title = "Edit this relation";
+    phrase.title = "Edit this link";
 
     target.type = "button";
     target.className = "relation-row-target";
@@ -2205,8 +2205,8 @@ function renderRelationList() {
     remove.dataset.action = "delete-relation";
     remove.dataset.relationId = entry.relation.id;
     remove.textContent = "×";
-    remove.setAttribute("aria-label", `Remove relation: ${relationSentence(entry.relation)}`);
-    remove.title = "Remove relation";
+    remove.setAttribute("aria-label", `Remove link: ${relationSentence(entry.relation)}`);
+    remove.title = "Remove link";
 
     item.append(phrase, target, remove);
     elements.relationList.append(item);
@@ -2232,10 +2232,10 @@ function removeRevitRelations() {
   if (count === 0) {
     return;
   }
-  recordObjectMutation(`remove ${count} Revit relation${count === 1 ? "" : "s"}`);
+  recordObjectMutation(`remove ${count} Revit link${count === 1 ? "" : "s"}`);
   state.relations = removeRelationsByOrigin(state.relations, "revit");
   refreshUi();
-  setStatus(`Removed ${count} relation${count === 1 ? "" : "s"} from the Revit export. Undo brings them back. Your own relations stay.`);
+  setStatus(`Removed ${count} link${count === 1 ? "" : "s"} from the Revit export. Undo brings them back. Your own links stay.`);
 }
 
 // Data from related objects: Revit parameters (when loaded) and object notes. Never copied or saved.
@@ -2430,7 +2430,7 @@ function exportOnexusGraph(objectIds = null) {
     : localNodes === nodes
       ? "Objects use local IDs; load the Revit file first to merge with CDI."
       : `${localNodes} object${localNodes === 1 ? "" : "s"} use local IDs.`;
-  setStatus(`Exported ${filename}: ${nodes} object${nodes === 1 ? "" : "s"}, ${edges} relation${edges === 1 ? "" : "s"}. ${identity}`);
+  setStatus(`Exported ${filename}: ${nodes} object${nodes === 1 ? "" : "s"}, ${edges} link${edges === 1 ? "" : "s"}. ${identity}`);
 }
 
 // ── Live ONEXUS link ─────────────────────────────────────
@@ -2600,7 +2600,7 @@ function setShowAllRelations(show) {
   elements.showAllRelations.checked = show;
   saveDisplayPreferences();
   renderOverlay();
-  setStatus(show ? "Showing every relation on this page." : "Showing relations of the selected object.");
+  setStatus(show ? "Showing every link on this page." : "Showing links of the selected object.");
 }
 
 function createRepresentationCard(occurrence, { isCurrent }) {
@@ -4385,6 +4385,8 @@ async function importSidecar(file, parsed) {
     state.notes = sidecar.notes;
     state.relations = sidecar.relations;
     state.revitData = null;
+    // A trace belongs to the project it started in; IDs like object-001 repeat across projects.
+    state.trace = null;
     state.selectedObjectId = null;
     state.selectedOccurrenceId = null;
     state.interaction = null;
@@ -4406,7 +4408,7 @@ async function importSidecar(file, parsed) {
             : "";
     setSidecarMessage(`Imported ${file.name}${migrationNote}.`);
     const missingCount = state.documents.length - state.documentSessions.size;
-    setStatus(`Restored ${state.documents.length} PDF${state.documents.length === 1 ? "" : "s"}, ${state.objects.length} object${state.objects.length === 1 ? "" : "s"}, ${state.occurrences.length} occurrence${state.occurrences.length === 1 ? "" : "s"}, ${state.notes.length} note${state.notes.length === 1 ? "" : "s"}, and ${state.relations.length} relation${state.relations.length === 1 ? "" : "s"}.${missingCount ? ` ${missingCount} PDF${missingCount === 1 ? " needs" : "s need"} relinking.` : ""}`);
+    setStatus(`Restored ${state.documents.length} PDF${state.documents.length === 1 ? "" : "s"}, ${state.objects.length} object${state.objects.length === 1 ? "" : "s"}, ${state.occurrences.length} occurrence${state.occurrences.length === 1 ? "" : "s"}, ${state.notes.length} note${state.notes.length === 1 ? "" : "s"}, and ${state.relations.length} link${state.relations.length === 1 ? "" : "s"}.${missingCount ? ` ${missingCount} PDF${missingCount === 1 ? " needs" : "s need"} relinking.` : ""}`);
   } catch (error) {
     console.error(error);
     setSidecarMessage(`Import failed: ${error.message}. The current session was not changed.`, true);
@@ -5003,7 +5005,7 @@ function deleteSelectedObject() {
   const occurrenceCount = getObjectOccurrences(state.occurrences, object.id).length;
   const relationCount = relationsForObject(state.relations, object.id).length;
   const relationWarning = relationCount
-    ? `\n${relationCount} relation${relationCount === 1 ? "" : "s"} will be removed. Undo brings them back.`
+    ? `\n${relationCount} link${relationCount === 1 ? "" : "s"} will be removed. Undo brings them back.`
     : "";
   const confirmed = globalThis.confirm(
     `Delete ${objectDisplayName(object)}?\n\n${occurrenceCount} occurrence${occurrenceCount === 1 ? "" : "s"} will remain as unlinked marks.${relationWarning}`,
@@ -5190,7 +5192,7 @@ function cancelCurrentAction() {
     }
     const wasRepeating = Boolean(state.relateRepeat);
     setRelateMode(null);
-    setStatus(wasRepeating ? "Finished adding relations." : "Relating cancelled.");
+    setStatus(wasRepeating ? "Finished adding links." : "Linking cancelled.");
     return true;
   }
 
