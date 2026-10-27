@@ -111,6 +111,14 @@ import {
 } from "./joinery-ai-handoff.mjs";
 import { createStoredZip } from "./zip-store.mjs";
 import { buildOnexusGraph } from "./onexus-export.mjs";
+import {
+  countPlacePages,
+  findPlaceCandidates,
+  indexPlaceTextPage,
+  openPlaceCandidates,
+  placeMarkBounds,
+  textsInsideMarks,
+} from "./place-finder.mjs";
 import { filterParameters, relatedDataSources } from "./related-data.mjs";
 import {
   createNote,
@@ -252,6 +260,15 @@ const elements = {
   traceSteps: document.querySelector("#traceSteps"),
   endTrace: document.querySelector("#endTrace"),
   traceList: document.querySelector("#traceList"),
+  findPlaces: document.querySelector("#findPlaces"),
+  placesPanel: document.querySelector("#placesPanel"),
+  placesTitle: document.querySelector("#placesTitle"),
+  closePlaces: document.querySelector("#closePlaces"),
+  placesForm: document.querySelector("#placesForm"),
+  placesQuery: document.querySelector("#placesQuery"),
+  placesChips: document.querySelector("#placesChips"),
+  placesSummary: document.querySelector("#placesSummary"),
+  placesList: document.querySelector("#placesList"),
   statusMessage: document.querySelector("#statusMessage"),
   documentSummary: document.querySelector("#documentSummary"),
   objectBadge: document.querySelector("#objectBadge"),
@@ -368,6 +385,8 @@ const state = {
   relateRepeat: null,
   // Relation trace from one pinned object. View only; never saved.
   trace: null,
+  // Find places: text hits for one object, waiting for a person to link them. View only; never saved.
+  places: null,
   // Optional read-only adapter data. It is never saved in the neutral project.
   revitData: null,
   selectedObjectId: null,
@@ -1661,6 +1680,7 @@ function renderOverlay() {
     overlayLayer.append(shape);
   }
 
+  renderPlaceCandidates();
   if (selectedOccurrence) {
     appendSelectionHandles(selectedOccurrence);
     appendRelationHandle(selectedOccurrence);
@@ -2401,6 +2421,291 @@ function renderTrace() {
     button.append(step, copy);
     item.append(button);
     elements.traceList.append(item);
+  }
+}
+
+// ── Find places ───────────────────────────────────────────
+// Searches the embedded text of every attached PDF for an object's tag.
+// Hits are dashed suggestions. Only a click links one; labels never merge identity.
+
+function getPlaceTextIndex(documentId) {
+  const session = getDocumentSession(documentId);
+  if (!session) {
+    return Promise.reject(new Error("This PDF is not attached."));
+  }
+  if (!session.placeIndexPromise) {
+    session.placeIndexPromise = (async () => {
+      const pages = [];
+      const pdf = session.pdfDocument;
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        // Marks are normalized against the page at its own rotation, never the view rotation.
+        const viewport = page.getViewport({ scale: 1 });
+        pages.push(indexPlaceTextPage(await page.getTextContent(), viewport, pageNumber));
+      }
+      return pages;
+    })().catch((error) => {
+      delete session.placeIndexPromise;
+      throw error;
+    });
+  }
+  return session.placeIndexPromise;
+}
+
+function openPlaceCandidateList() {
+  if (!state.places) {
+    return [];
+  }
+  return openPlaceCandidates(state.places.candidates, state.occurrences, state.places.objectId, state.places.dismissed);
+}
+
+async function openPlaceFinder(objectId) {
+  const object = getObject(objectId);
+  if (!object || !state.pdfDocument) {
+    return;
+  }
+  if (state.selectedObjectId !== object.id) {
+    state.selectedObjectId = object.id;
+    state.selectedOccurrenceId = null;
+  }
+  state.places = {
+    objectId: object.id,
+    query: "",
+    candidates: [],
+    dismissed: new Set(),
+    chips: [],
+    searching: false,
+    skipped: 0,
+    generation: 0,
+  };
+  showProperties();
+  refreshUi();
+  elements.placesQuery.value = object.label;
+  elements.placesQuery.focus();
+  elements.placesQuery.select();
+  // Texts inside this object's marks are often its tag. Offer them as one-click queries.
+  const chips = [];
+  for (const documentId of attachedDocumentIds()) {
+    const marks = getObjectOccurrences(state.occurrences, object.id).filter((occurrence) => occurrence.documentId === documentId);
+    if (marks.length === 0) {
+      continue;
+    }
+    try {
+      chips.push(...textsInsideMarks(await getPlaceTextIndex(documentId), marks));
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  if (state.places?.objectId === object.id) {
+    state.places.chips = [...new Set(chips)].filter((chip) => chip.toLocaleLowerCase() !== object.label.toLocaleLowerCase()).slice(0, 4);
+    renderPlaces();
+  }
+  setStatus(`Find places for ${objectDisplayName(object)}. Type its tag, then Find. Nothing links until you click.`);
+}
+
+function closePlaceFinder() {
+  if (!state.places) {
+    return;
+  }
+  state.places = null;
+  refreshUi();
+  setStatus("Find places closed.");
+}
+
+async function runPlaceFinder(query) {
+  const places = state.places;
+  const text = String(query ?? "").trim();
+  if (!places || !text) {
+    return;
+  }
+  const generation = ++places.generation;
+  places.query = text;
+  places.candidates = [];
+  places.searching = true;
+  places.skipped = state.documents.length - attachedDocumentIds().length;
+  renderPlaces();
+  renderOverlay();
+  const candidates = [];
+  for (const documentId of attachedDocumentIds()) {
+    try {
+      candidates.push(...findPlaceCandidates(await getPlaceTextIndex(documentId), text, { documentId }));
+    } catch (error) {
+      console.error(error);
+      places.skipped += 1;
+    }
+  }
+  if (state.places !== places || places.generation !== generation) {
+    return;
+  }
+  places.candidates = candidates;
+  places.searching = false;
+  refreshUi();
+  const open = openPlaceCandidateList();
+  setStatus(open.length > 0
+    ? `${open.length} possible place${open.length === 1 ? "" : "s"} for “${text}” on ${countPlacePages(open)} page${countPlacePages(open) === 1 ? "" : "s"}. Click one to go there; Link adds the mark.`
+    : `No new places for “${text}”.`);
+}
+
+function findOpenPlaceCandidate(key) {
+  return openPlaceCandidateList().find((candidate) => candidate.key === key) ?? null;
+}
+
+async function goToPlaceCandidate(key) {
+  const candidate = findOpenPlaceCandidate(key);
+  if (!candidate) {
+    return;
+  }
+  if (candidate.documentId !== state.activeDocumentId || candidate.page !== state.pageNumber) {
+    await navigateFromDrawingMap(candidate.documentId, candidate.page);
+  }
+  state.places.focusKey = key;
+  renderOverlay();
+  renderPlaces();
+  elements.overlay.querySelector(`[data-place-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+}
+
+function linkPlaceCandidate(key) {
+  const candidate = findOpenPlaceCandidate(key);
+  const object = getObject(state.places?.objectId);
+  if (!candidate || !object) {
+    return;
+  }
+  const occurrence = createOccurrence(
+    state.occurrences,
+    candidate.page,
+    placeMarkBounds(candidate.bounds),
+    object.id,
+    candidate.documentId,
+    "rectangle",
+  );
+  recordObjectMutation(`create ${occurrence.id} from found text`);
+  state.occurrences.push(occurrence);
+  state.selectedObjectId = object.id;
+  if (candidate.documentId === state.activeDocumentId && candidate.page === state.pageNumber) {
+    state.selectedOccurrenceId = occurrence.id;
+  }
+  refreshUi();
+  const left = openPlaceCandidateList().length;
+  setStatus(`${markName(occurrence)} linked to ${objectDisplayName(object)} on page ${candidate.page}. ${left} place${left === 1 ? "" : "s"} left.`);
+}
+
+function dismissPlaceCandidate(key) {
+  if (!state.places) {
+    return;
+  }
+  state.places.dismissed.add(key);
+  refreshUi();
+  setStatus("Place dismissed for this session.");
+}
+
+function placeLocationLabel(candidate) {
+  const name = state.documents.length > 1
+    ? `${(getProjectDocument(candidate.documentId)?.name ?? "").replace(/\.pdf$/i, "")} `
+    : "";
+  return `${name}p.${candidate.page}`;
+}
+
+function renderPlaces() {
+  if (state.places && (!getObject(state.places.objectId) || state.places.objectId !== state.selectedObjectId)) {
+    state.places = null;
+  }
+  const places = state.places;
+  elements.findPlaces.disabled = !state.pdfDocument;
+  elements.findPlaces.setAttribute("aria-pressed", String(Boolean(places)));
+  elements.placesPanel.hidden = !places;
+  elements.placesList.replaceChildren();
+  elements.placesChips.replaceChildren();
+  if (!places) {
+    return;
+  }
+  elements.placesTitle.textContent = `Find places for ${objectDisplayName(getObject(places.objectId))}`;
+  for (const chip of places.chips) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "places-chip";
+    button.dataset.query = chip;
+    button.textContent = chip;
+    button.title = `Find “${chip}”. Found inside this object's marks.`;
+    elements.placesChips.append(button);
+  }
+  elements.placesChips.hidden = places.chips.length === 0;
+
+  const open = openPlaceCandidateList();
+  const skipped = places.skipped > 0 ? ` ${places.skipped} PDF${places.skipped === 1 ? "" : "s"} not attached, not searched.` : "";
+  if (places.searching) {
+    elements.placesSummary.textContent = `Searching for “${places.query}”…`;
+  } else if (!places.query) {
+    elements.placesSummary.textContent = "Finds embedded PDF text only. Scanned drawings have none.";
+  } else if (open.length === 0) {
+    elements.placesSummary.textContent = `No new places for “${places.query}”.${skipped}`;
+  } else {
+    const pageCount = countPlacePages(open);
+    elements.placesSummary.textContent = `${open.length} possible place${open.length === 1 ? "" : "s"} on ${pageCount} page${pageCount === 1 ? "" : "s"}.${skipped}`;
+  }
+
+  for (const candidate of open) {
+    const item = document.createElement("li");
+    item.className = "places-item";
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "places-go";
+    go.dataset.placeKey = candidate.key;
+    if (candidate.key === places.focusKey) {
+      go.setAttribute("aria-current", "true");
+    }
+    const where = document.createElement("strong");
+    where.textContent = placeLocationLabel(candidate);
+    const context = document.createElement("small");
+    const other = getObject(candidate.insideObjectId);
+    context.textContent = other ? `“${candidate.text}” · inside ${objectDisplayName(other)}` : `“${candidate.text}”`;
+    go.append(where, context);
+    go.title = "Go to this place";
+
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "compact-action";
+    link.dataset.placeKey = candidate.key;
+    link.dataset.placeAction = "link";
+    link.textContent = "Link";
+    link.title = `Mark this place as ${objectDisplayName(getObject(places.objectId))}`;
+
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "icon-button";
+    dismiss.dataset.placeKey = candidate.key;
+    dismiss.dataset.placeAction = "dismiss";
+    dismiss.textContent = "×";
+    dismiss.setAttribute("aria-label", `Dismiss ${placeLocationLabel(candidate)}`);
+    dismiss.title = "Not this object";
+
+    item.append(go, link, dismiss);
+    elements.placesList.append(item);
+  }
+}
+
+// Dashed boxes on the current page. A click links the place.
+function renderPlaceCandidates() {
+  if (!state.places || state.markMode || !overlayLayer) {
+    return;
+  }
+  const object = getObject(state.places.objectId);
+  for (const candidate of openPlaceCandidateList()) {
+    if (candidate.documentId !== state.activeDocumentId || candidate.page !== state.pageNumber) {
+      continue;
+    }
+    const classes = ["place-candidate"];
+    if (candidate.key === state.places.focusKey) {
+      classes.push("is-focused");
+    }
+    const shape = makeSvgShape("rectangle", placeMarkBounds(candidate.bounds), null, classes.join(" "));
+    shape.dataset.placeKey = candidate.key;
+    shape.setAttribute("role", "button");
+    shape.setAttribute("tabindex", "0");
+    shape.setAttribute("aria-label", `Possible place for ${objectDisplayName(object)}: “${candidate.text}”. Press Enter to link.`);
+    const title = document.createElementNS(SVG_NAMESPACE, "title");
+    title.textContent = `Click to link to ${objectDisplayName(object)}`;
+    shape.append(title);
+    overlayLayer.append(shape);
   }
 }
 
@@ -3346,6 +3651,12 @@ function objectMenuItems(object, occurrence = null) {
       run: () => setMarkMode(true, object.id),
     },
     {
+      label: "Find other places…",
+      disabled: !state.pdfDocument,
+      title: "Find this object's tag text on other pages",
+      run: () => openPlaceFinder(object.id),
+    },
+    {
       label: "Trace links",
       disabled: linkCount === 0,
       run: () => (state.trace ? null : startTrace()),
@@ -3492,6 +3803,7 @@ function refreshObjectUi() {
   renderRelationList();
   renderRelatedData();
   renderTrace();
+  renderPlaces();
   syncOnexusLink();
   renderUnlinkedOccurrences();
   renderNotes();
@@ -4387,6 +4699,7 @@ async function importSidecar(file, parsed) {
     state.revitData = null;
     // A trace belongs to the project it started in; IDs like object-001 repeat across projects.
     state.trace = null;
+    state.places = null;
     state.selectedObjectId = null;
     state.selectedOccurrenceId = null;
     state.interaction = null;
@@ -4574,6 +4887,11 @@ function handleOverlayPointerDown(event) {
   }
   if (event.target.dataset?.relationHandle) {
     startRelationDrag(event);
+    return;
+  }
+  if (event.target.dataset?.placeKey && !state.markMode && !state.relateFromObjectId) {
+    linkPlaceCandidate(event.target.dataset.placeKey);
+    event.preventDefault();
     return;
   }
 
@@ -4895,6 +5213,11 @@ function handleOverlayClick(event) {
 
 function handleOverlayKeyDown(event) {
   if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  if (event.target.dataset?.placeKey) {
+    event.preventDefault();
+    linkPlaceCandidate(event.target.dataset.placeKey);
     return;
   }
 
@@ -5616,6 +5939,35 @@ elements.relatedDataList.addEventListener("click", async (event) => {
 });
 elements.toggleTrace.addEventListener("click", () => (state.trace ? endTrace() : startTrace()));
 elements.endTrace.addEventListener("click", endTrace);
+elements.findPlaces.addEventListener("click", () => (
+  state.places?.objectId === state.selectedObjectId ? closePlaceFinder() : openPlaceFinder(state.selectedObjectId)
+));
+elements.closePlaces.addEventListener("click", closePlaceFinder);
+elements.placesForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void runPlaceFinder(elements.placesQuery.value);
+});
+elements.placesChips.addEventListener("click", (event) => {
+  const chip = event.target.closest("button[data-query]");
+  if (chip) {
+    elements.placesQuery.value = chip.dataset.query;
+    void runPlaceFinder(chip.dataset.query);
+  }
+});
+elements.placesList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-place-key]");
+  if (!button) {
+    return;
+  }
+  const { placeKey, placeAction } = button.dataset;
+  if (placeAction === "link") {
+    linkPlaceCandidate(placeKey);
+  } else if (placeAction === "dismiss") {
+    dismissPlaceCandidate(placeKey);
+  } else {
+    void goToPlaceCandidate(placeKey);
+  }
+});
 elements.exportOnexus.addEventListener("click", () => exportOnexusGraph());
 elements.linkOnexus.addEventListener("click", () => {
   if (onexusLinkOpen() && onexusLink.ready) {

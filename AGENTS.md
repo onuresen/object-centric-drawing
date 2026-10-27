@@ -62,6 +62,7 @@ The one-way Revit export adapter in `revit-addin/` is allowed (see `DECISIONS.md
 - [x] Group AM — door sides (`side: "to" | "from"` on `connectsTo`, from Revit To/From Room) and a view-only Related data section showing Revit parameters and notes of the objects a selected object opens to, is hosted on, or takes data from.
 - [x] Group AN — UI cleanup: compact fonts, floating Properties panel (left, draggable, P), object browser alone on the right rail, groups start collapsed, right-click menu on marks/page/browser rows with "Link to another object…", and readable names ("Door 577", "Mark 12") with IDs kept out of the UI.
 - [x] Group AO — ui-system Executive skin: local `ui-base.css` + `palettes/executive.css` copies, self-hosted fonts, `--accent` blue for actions and selection, `--mark` orange for marks, `--accent2` bronze for warnings.
+- [x] Group AP — Find places: whole-word search of embedded text in every attached PDF for an object's tag, dashed suggestion boxes and a list in Properties, Link by one click (one undo step), session-only dismiss, and texts inside the object's marks offered as queries. Suggestions only; nothing is saved.
 - [ ] Revit verification — rectangle export was built and run on one real sheet; build and run the newer Outline option, then check multi-sheet page order. Checklist in `revit-addin/README.md`.
 - [ ] Later, when needed — toolbar back/forward buttons and a level filter in the Revit export.
 - [x] Public hosting — GitHub Pages deploys the static app from `main` after source checks and tests pass.
@@ -99,6 +100,7 @@ The one-way Revit export adapter in `revit-addin/` is allowed (see `DECISIONS.md
 | `related-data.mjs` | Pure related-data sources (takes data from, opens to, hosted on) and parameter filtering with Japanese aliases. |
 | `note-model.mjs` | Pure project, object, and occurrence note creation, editing, removal, and stable identity. |
 | `relation-model.mjs` | Pure relation vocabulary, create/edit/remove rules, phrases from either end, type suggestion, and arc geometry. |
+| `place-finder.mjs` | Pure text-item boxes in normalized page coordinates, whole-word tag search, open-hit filtering against existing marks, and mark padding. |
 | `evidence-export.mjs` | Pure evidence filename and companion preview-asset index helpers. |
 | `joinery-ai-handoff.mjs` | Pure Joinery AI eligibility, handoff index, provenance, and AI instruction builder. |
 | `zip-store.mjs` | Minimal dependency-free stored-ZIP writer for portable evidence bundles. |
@@ -119,6 +121,7 @@ The one-way Revit export adapter in `revit-addin/` is allowed (see `DECISIONS.md
 | `tests/related-data.test.mjs` | Node tests for related-data source order, default filters, and alias matching. |
 | `tests/note-model.test.mjs` | Node tests for note identity, scope requirements, editable text, and removal. |
 | `tests/relation-model.test.mjs` | Node tests for relation rules, vocabulary, suggestions, arcs, lanes, v6 round-trip, and v5 migration. |
+| `tests/place-finder.test.mjs` | Node tests for text boxes on upright and rotated pages, whole-word matching, open-hit filtering, mark padding, and in-mark texts. |
 | `tests/evidence-export.test.mjs` | Node tests for safe export names and included/unavailable asset accounting. |
 | `tests/joinery-ai-handoff.test.mjs` | Node tests for eligibility, exact provenance, fail-closed packaging, instructions, and prompt drift. |
 | `tests/zip-store.test.mjs` | Node tests for CRC-32, stored-ZIP structure, and safe archive paths. |
