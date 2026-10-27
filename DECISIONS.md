@@ -571,3 +571,25 @@
 **Alternative:** Tier B, tokens only, no `ui-base.css` copy. Rejected: the app is vanilla and no-build, which is exactly Tier A.
 
 **Confidence:** high.
+
+## 2026-10-27 — Find places: text hits as suggestions, linked by a click
+
+**Decision:** "Find places" searches the embedded text of every attached PDF for an object's tag. Each hit shows as a dashed box and a list row. A person clicks Link to make it a mark. Nothing links on its own.
+
+**Why:** Marking every place by hand is the costliest step. It decides whether object navigation feels worth it. Tags such as `D03` are usually real text in plans and schedules, so the hits are cheap and often right.
+
+**Identity rule kept:** A hit is evidence, not identity. Each mark still comes from one explicit click, in one undo step. A hit inside another object's mark is shown with that object's name, so the person can judge it.
+
+**Matching:** Case-insensitive and whole-word, so `D1` does not find `D10`. A hit stays inside one PDF.js text item. Hits inside this object's own marks are hidden. Dismissed hits stay hidden for the session.
+
+**Defaults:** The query starts as the object's name. Short texts inside the object's marks are offered as one-click queries.
+
+**View only:** Hits, dismissals and the query are never saved and never enter history. The project format does not change.
+
+**Alternative:** Link all hits at once. Rejected: one wrong hit would merge identity silently, which the product forbids. OCR for scanned sheets. Rejected: still out of scope.
+
+**Revisit when:** Real drawing sets show tags split across text items, or a "link all on this page" is asked for.
+
+**Confidence:** med. Driven in Chromium on a synthetic two-page PDF. Needs a real drawing set.
+
+**Prediction:** On a real set, most of an object's other places come from a hit, not a hand-drawn mark.

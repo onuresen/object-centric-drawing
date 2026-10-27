@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="vendor/fonts/fonts.css">
   <link rel="stylesheet" href="ui-base.css">
   <link rel="stylesheet" href="palettes/executive.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-09-executive">
+  <link rel="stylesheet" href="styles.css?v=2026-10-27-places">
 </head>
 <body>
   <header class="app-header">
@@ -236,10 +236,26 @@
           <div class="panel-actions">
             <button id="markForObject" class="button button-primary" type="button" aria-label="Mark another occurrence" title="Mark another occurrence" disabled>Mark</button>
             <button id="relateFromPanel" class="button" type="button" aria-keyshortcuts="C" title="Link this object to another object (C). Then click the other mark.">Link to…</button>
+            <button id="findPlaces" class="button" type="button" title="Find this object's tag text on other pages. You confirm each place.">Find places</button>
             <button id="deleteObject" class="button danger-button" type="button" aria-label="Delete selected object" title="Delete selected object">Delete</button>
           </div>
 
           <div id="objectLensSummary" class="object-lens-summary" aria-live="polite"></div>
+
+          <section id="placesPanel" class="places-panel" aria-labelledby="placesTitle" hidden>
+            <div class="places-heading">
+              <strong id="placesTitle">Find places</strong>
+              <button id="closePlaces" class="icon-button" type="button" aria-label="Close Find places" title="Close">×</button>
+            </div>
+            <form id="placesForm" class="form-row">
+              <label class="visually-hidden" for="placesQuery">Text to find</label>
+              <input id="placesQuery" class="text-input" type="search" maxlength="80" placeholder="Tag text, e.g. D03" autocomplete="off">
+              <button class="button" type="submit">Find</button>
+            </form>
+            <div id="placesChips" class="places-chips"></div>
+            <p id="placesSummary" class="quiet-copy" aria-live="polite"></p>
+            <ol id="placesList" class="places-list"></ol>
+          </section>
 
           <section class="relation-section" aria-labelledby="relationSectionTitle">
             <div class="subsection-heading">
